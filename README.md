@@ -25,3 +25,5 @@ cd frontend
 npm install
 npm run dev
 
+<img width="732" height="315" alt="image" src="https://github.com/user-attachments/assets/14d6e30e-5bef-497b-b4a0-b57c2f7ef73c" />
+
