@@ -5,24 +5,21 @@ import { uploadFile } from "@/lib/api";
 import { TextEditorHandle } from "@/components/admin/TextEditor";
 
 type Props = {
-  editorRef: React.RefObject<TextEditorHandle>;  // ✅ RefObject, not nullable
+  editorRef: React.RefObject<TextEditorHandle>;
   persistKey?: string;
 };
 
 export default function AudioFeather({ editorRef }: Props) {
+  const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [captionFile, setCaptionFile] = useState<File | null>(null);
   const [captionUrl, setCaptionUrl] = useState<string | null>(null);
 
-  // Upload handler
-  const handleUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-    setUrl: (url: string) => void
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // --- Upload helpers ---
+  const handleUpload = async (file: File, setUrl: (url: string) => void) => {
     try {
       const res = await uploadFile(file);
-      const href = res.data?.href;
+      const href = res.href;
       if (href) {
         setUrl(href);
       } else {
@@ -34,31 +31,44 @@ export default function AudioFeather({ editorRef }: Props) {
     }
   };
 
-  // Insert uploaded audio into editor
-  const handleInsertAudio = () => {
-    if (!audioUrl) return alert("Please upload an audio file first.");
-    if (!editorRef.current) return alert("Editor is not ready."); // ✅ should now work
+  // --- Insert audio ---
+ const insertAudio = () => {
+  if (!audioUrl) return alert("Please upload an audio file first.");
+  if (!editorRef.current) return alert("Editor is not ready.");
+
+  // Ensure we point to backend correctly
+  const fullUrl = audioUrl.startsWith("http")
+    ? audioUrl
+    : `http://127.0.0.1:5000${audioUrl}`;
+
+  editorRef.current.insertAtCaret(`<audio controls src="${fullUrl}"></audio>\n`);
+};
+
+
+  // --- Insert captions ---
+  const insertCaptions = () => {
+    if (!captionUrl) return alert("Please upload a captions file first.");
+    if (!editorRef.current) return alert("Editor is not ready.");
+        const fullCaptionUrl = captionUrl?.startsWith("http")
+      ? captionUrl
+      : `http://127.0.0.1:5000${captionUrl}`;
 
     editorRef.current.insertAtCaret(
-      `<audio controls src="${audioUrl}"></audio>\n`
+      `<track src="${fullCaptionUrl}" kind="captions" />\n`
     );
-    if (captionUrl) {
-      editorRef.current.insertAtCaret(
-        `<track src="${captionUrl}" kind="captions" />\n`
-      );
-    }
+
   };
 
   return (
     <div className="space-y-6 p-4 border rounded bg-gray-50">
-      {/* --- Audio file upload --- */}
+      {/* --- Audio file controls --- */}
       <div>
         <label className="block font-medium mb-1">Audio File</label>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 mb-2">
           <input
             type="file"
             accept="audio/*"
-            onChange={(e) => handleUpload(e, setAudioUrl)}
+            onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
             className="hidden"
             id="audio-file"
           />
@@ -70,16 +80,52 @@ export default function AudioFeather({ editorRef }: Props) {
           </label>
           {audioUrl && <span className="text-sm text-green-600">Uploaded ✓</span>}
         </div>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              setAudioFile(null);
+              setAudioUrl(null);
+            }}
+            className="px-4 py-2 border rounded bg-gray-100 hover:bg-gray-200"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={insertAudio}
+            disabled={!audioUrl}
+            className={`px-4 py-2 border rounded ${
+              audioUrl
+                ? "bg-blue-600 text-white hover:bg-blue-700"
+                : "bg-gray-200 text-gray-500 cursor-not-allowed"
+            }`}
+          >
+            Insert
+          </button>
+          <button
+            type="button"
+            onClick={() => audioFile && handleUpload(audioFile, setAudioUrl)}
+            disabled={!audioFile}
+            className={`px-4 py-2 border rounded ${
+              audioFile
+                ? "bg-green-600 text-white hover:bg-green-700"
+                : "bg-gray-200 text-gray-500 cursor-not-allowed"
+            }`}
+          >
+            Upload
+          </button>
+        </div>
       </div>
 
-      {/* --- Captions upload --- */}
+      {/* --- Captions controls --- */}
       <div>
-        <label className="block font-medium mb-1">Captions</label>
-        <div className="flex items-center gap-2">
+        <label className="block font-medium mb-1">Captions File</label>
+        <div className="flex items-center gap-2 mb-2">
           <input
             type="file"
             accept=".vtt,.srt"
-            onChange={(e) => handleUpload(e, setCaptionUrl)}
+            onChange={(e) => setCaptionFile(e.target.files?.[0] || null)}
             className="hidden"
             id="caption-file"
           />
@@ -91,37 +137,42 @@ export default function AudioFeather({ editorRef }: Props) {
           </label>
           {captionUrl && <span className="text-sm text-green-600">Uploaded ✓</span>}
         </div>
-      </div>
-
-      {/* Action buttons */}
-      <div className="flex gap-3">
-        <button
-          type="button"
-          onClick={() => {
-            setAudioUrl(null);
-            setCaptionUrl(null);
-          }}
-          className="px-4 py-2 border rounded bg-gray-100 hover:bg-gray-200"
-        >
-          Edit
-        </button>
-        <button
-          type="button"
-          onClick={handleInsertAudio}
-          className="px-4 py-2 border rounded bg-blue-600 text-white hover:bg-blue-700"
-        >
-          Insert
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            if (!audioUrl) return alert("Upload an audio file first.");
-            alert("File is already uploaded to server.");
-          }}
-          className="px-4 py-2 border rounded bg-gray-100 hover:bg-gray-200"
-        >
-          Upload
-        </button>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              setCaptionFile(null);
+              setCaptionUrl(null);
+            }}
+            className="px-4 py-2 border rounded bg-gray-100 hover:bg-gray-200"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={insertCaptions}
+            disabled={!captionUrl}
+            className={`px-4 py-2 border rounded ${
+              captionUrl
+                ? "bg-blue-600 text-white hover:bg-blue-700"
+                : "bg-gray-200 text-gray-500 cursor-not-allowed"
+            }`}
+          >
+            Insert
+          </button>
+          <button
+            type="button"
+            onClick={() => captionFile && handleUpload(captionFile, setCaptionUrl)}
+            disabled={!captionFile}
+            className={`px-4 py-2 border rounded ${
+              captionFile
+                ? "bg-green-600 text-white hover:bg-green-700"
+                : "bg-gray-200 text-gray-500 cursor-not-allowed"
+            }`}
+          >
+            Upload
+          </button>
+        </div>
       </div>
     </div>
   );

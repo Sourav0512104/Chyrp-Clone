@@ -13,21 +13,52 @@ def create_app():
     app.config["SQLALCHEMY_DATABASE_URI"] = "mysql+mysqldb://root:Kssblr%402005@localhost/chyrp_clone"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+    # ✅ Uploads folder setup
+    import os
+    BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+    UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
+    app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
     db.init_app(app)
     with app.app_context():
         db.create_all()
 
     # Register routes AFTER db is set up
+    
     from routes import text
     app.register_blueprint(text.bp)
+    
+    from routes import posts
+    app.register_blueprint(posts.bp)
+    
+    from routes import photo
+    app.register_blueprint(photo.bp, url_prefix="/api")
+
     from routes import preview
     app.register_blueprint(preview.preview_bp, url_prefix="/api")
+    
     from routes import feathers
     app.register_blueprint(feathers.bp, url_prefix="/api")
+    
+    from routes import link
+    app.register_blueprint(link.bp, url_prefix="/api")
+    
+    from routes import audio
+    app.register_blueprint(audio.bp, url_prefix="/api")
+    
+    from routes import uploads
+    app.register_blueprint(uploads.uploads_bp, url_prefix="/api")
+    
+    from routes import quote
+    app.register_blueprint(quote.bp, url_prefix="/api")
 
-    # NEW: modules endpoints
     from routes import modules
     app.register_blueprint(modules.bp, url_prefix="/api")
+    app.config["JWT_SECRET"] = os.environ.get("JWT_SECRET", "dev-secret-change-me")
+
+    from routes import auth
+    app.register_blueprint(auth.auth_bp, url_prefix="/api")
 
     # ---------- CACHER MIDDLEWARE ----------
     CACHEABLE_PATHS = (
